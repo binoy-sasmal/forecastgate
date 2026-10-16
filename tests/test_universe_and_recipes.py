@@ -34,7 +34,7 @@ def _panel(series: dict[str, list[float]], first_week: str = "2010-01-04") -> Pa
 
 
 def _settings(*, universe_size: int = 200, min_universe_size: int = 50) -> Settings:
-    base = settings_for(fixture=True, root=Path("."))
+    base = settings_for(fixture=False, root=Path("."))  # the 26-week rule
     return replace(base, universe_size=universe_size, min_universe_size=min_universe_size)
 
 

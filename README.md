@@ -37,7 +37,9 @@ docker run --rm --network none forecastgate uv run forecastgate reproduce --fixt
 | Product universe as of the cutoff | Implemented, tested | `tests/test_universe_and_recipes.py` |
 | `naive` and `ma4` baseline recipes | Implemented, tested | `tests/test_universe_and_recipes.py` |
 | Prediction contract, locked atomic publication, idempotent reruns, identity covering the model input | Implemented, tested | `tests/test_publish.py`, `tests/test_reproduce_fixture.py` |
-| Feature engineering, leakage tests | Planned | |
+| Features at a forecast origin, training rows with `t + h <= T`, inference rows | Implemented, tested | `tests/test_features.py` (hand-computed alignment, missing weeks) |
+| Leakage tests: truncation equivalence at fold cutoffs and training origins, label eligibility, two planted leaks | Implemented, tested on the fixture | `tests/test_leakage.py` |
+| Backtest cutoffs | Implemented, tested | `tests/test_features.py` |
 | Rolling-origin backtest, LightGBM, metrics | Planned | |
 | Promotion gate, registry, baseline champion | Planned | |
 | Read-only serving with freshness checks | Planned | |

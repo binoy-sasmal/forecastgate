@@ -32,6 +32,8 @@ class Settings:
     min_history_weeks: int = 26
     ranking_window_weeks: int = 26
     horizons: tuple[int, ...] = (1, 2, 3, 4)
+    n_folds: int = 6
+    fold_spacing_weeks: int = 4
     reports_dir: Path = Path("reports")
 
     @property
@@ -61,4 +63,15 @@ def settings_for(*, fixture: bool, root: Path, artifacts_dir: Path | None = None
     artifacts = artifacts_dir or root / "artifacts" / source.name
     # Only the full run writes the committed reports; fixture reports stay with its artifacts.
     reports = artifacts / "reports" if fixture else root / "reports"
+    if fixture:
+        # The fixture spans 42 complete weeks, too few for six folds under the 26-week
+        # history rule. Its profile shortens only the universe windows; everything else,
+        # including folds, horizons and universe size, matches the full run.
+        return Settings(
+            source=source,
+            artifacts_dir=artifacts,
+            reports_dir=reports,
+            min_history_weeks=8,
+            ranking_window_weeks=8,
+        )
     return Settings(source=source, artifacts_dir=artifacts, reports_dir=reports)

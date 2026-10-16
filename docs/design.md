@@ -134,15 +134,25 @@ One global LightGBM recipe, direct multi-horizon (h is a feature), Tweedie objec
 predictions are non-negative by construction for count-like data. A shared postprocess
 step clips to `>= 0` and is used identically in backtest and inference.
 
-Features: lags 1 to 8, shifted rolling mean and std over 4 and 8 weeks, week of year,
-recent median price, weeks since first sale, share of zero weeks in the last 8.
+Features at origin t (implemented in `features.py`; every window ends at t and counts
+calendar weeks, so week t itself is known and week t + 1 is not):
+
+- `lag_0` to `lag_7`: y[t] to y[t - 7]. A zero-transaction week is missing, not 0.
+- `mean_4`, `std_4`, `mean_8`, `std_8`: over observed weeks in the window; a mean needs one
+  observed week, a population standard deviation two.
+- `zero_share_8`: share of observed weeks in the last 8 with 0 recorded sales.
+- `price_median_8`: median over the last 8 weeks of each week's median unit price; weeks
+  without sales have no price.
+- `weeks_since_first_sale`, `horizon`, and `target_week_of_year` (calendar of week t + h,
+  known in advance).
 Hyperparameters are fixed and documented. No tuning in v1: tuning inside the backtest
 would need nested folds.
 
 ### Backtest
 
 Six cutoffs 4 weeks apart. The last cutoff is the last complete week minus 4, so every
-fold has all four horizons observed. Each recipe is refitted per fold using only that
+fold has all four horizons observed. The fixture profile shortens only the universe
+windows (8 weeks of history and ranking instead of 26) so six folds fit its 42 weeks. Each recipe is refitted per fold using only that
 fold's eligible examples. Candidate, baselines and champion are always evaluated as
 recipes on the **same folds**, never as a model fitted on later data.
 
@@ -164,7 +174,7 @@ and is never the gate bar.
 ### Leakage tests
 
 1. **Truncation equivalence.** At each evaluation cutoff T **and** at sampled individual
-   training origins t, build universe and features from raw data truncated at that point,
+   training origins t (`tests/test_leakage.py`, on the real fixture), build universe and features from raw data truncated at that point,
    and from full raw data whose later records are altered (quantities, prices,
    descriptions, products added and removed). The two must be identical. Week t itself is
    available at origin t, so features may include it.

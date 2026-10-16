@@ -25,6 +25,7 @@ PANEL_SCHEMA = pa.DataFrameSchema(
         "stock_code": pa.Column(str, nullable=False),
         "week": pa.Column("datetime64[us]", pa.Check(lambda s: s.dt.dayofweek == 0, name="monday")),
         "quantity": pa.Column("float64", pa.Check.ge(0), nullable=True),
+        "price": pa.Column("float64", pa.Check.gt(0), nullable=True),
     },
     unique=["stock_code", "week"],
     strict=True,
@@ -34,7 +35,9 @@ PANEL_SCHEMA = pa.DataFrameSchema(
 
 @dataclass(frozen=True)
 class Panel:
-    frame: pd.DataFrame  # stock_code, week, quantity (NaN on zero-transaction weeks)
+    # stock_code, week, quantity (NaN on zero-transaction weeks), price (median unit price
+    # of the week's sales lines; NaN in weeks without sales)
+    frame: pd.DataFrame
     first_sale_week: pd.Series  # stock_code -> week of first recorded sale
     weeks: pd.DatetimeIndex  # complete weeks, ascending
     zero_transaction_weeks: pd.DatetimeIndex
@@ -80,9 +83,8 @@ def build_panel(data: IngestResult) -> Panel:
     first_sale = sales.groupby("StockCode")["week"].min().rename("first_sale_week")
     first_sale.index = first_sale.index.astype(str).rename("stock_code")
     weekly = (
-        sales.groupby(["StockCode", "week"])["Quantity"]
-        .sum()
-        .rename("quantity")
+        sales.groupby(["StockCode", "week"])
+        .agg(quantity=("Quantity", "sum"), price=("Price", "median"))
         .reset_index()
         .rename(columns={"StockCode": "stock_code"})
     )
@@ -93,6 +95,7 @@ def build_panel(data: IngestResult) -> Panel:
     grid = grid[grid["week"] >= grid["stock_code"].map(first_sale)]
     frame = grid.merge(weekly, on=["stock_code", "week"], how="left")
     frame["quantity"] = frame["quantity"].fillna(0).astype("float64")
+    frame["price"] = frame["price"].astype("float64")
     frame.loc[frame["week"].isin(zero_weeks), "quantity"] = float("nan")
     frame = frame.sort_values(["stock_code", "week"], kind="mergesort").reset_index(drop=True)
     frame["stock_code"] = frame["stock_code"].astype(str)
