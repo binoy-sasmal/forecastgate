@@ -12,6 +12,7 @@ dependencies = [
     "pandas>=2.2",
     "pandera>=0.24",
     "pyarrow>=18",
+    "pyyaml>=6.0",
     "typer>=0.15",
 ]
 
@@ -24,6 +25,7 @@ dev = [
     "pandas-stubs>=2.2",
     "pytest>=8.3",
     "ruff>=0.8",
+    "types-pyyaml>=6.0",
 ]
 
 [build-system]

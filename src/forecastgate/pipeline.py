@@ -16,22 +16,22 @@ from pathlib import Path
 from forecastgate.audit import AUDIT_FILE, render_data_audit, write_report
 from forecastgate.backtest import BacktestResult, render_report, run_backtest
 from forecastgate.config import Settings
-from forecastgate.errors import ForecastgateError
 from forecastgate.features import Leak
-from forecastgate.ingest import Exclusion, ingest, sha256_file
+from forecastgate.gate import (
+    GATE_FILE,
+    Freeze,
+    GateConfigError,
+    check_configuration,
+    load_gate,
+    verify_freeze,
+)
+from forecastgate.ingest import Exclusion, ingest
 from forecastgate.panel import build_panel
 from forecastgate.publish import ArtifactIdentity, PublishResult, publish
 from forecastgate.recipes import LightGBM, MovingAverage, Naive, Recipe
 from forecastgate.universe import select_universe
 
-GATE_FILE = "gate.yaml"
 BACKTEST_FILE = "backtest.md"
-
-
-class GateNotFrozenError(ForecastgateError):
-    """A full-data evaluation was requested before the gate config was committed."""
-
-    exit_code = 7
 
 
 @dataclass(frozen=True)
@@ -131,27 +131,39 @@ def backtest_recipes(leak: Leak | None = None) -> dict[str, Recipe]:
 def backtest(
     settings: Settings, *, root: Path, fixture: bool, leak: Leak | None = None
 ) -> BacktestSummary:
-    """Backtest every recipe. A full-data run requires the frozen gate config."""
+    """Backtest every recipe and apply the gate.
+
+    A full-data run first verifies that gate.yaml is committed and unchanged, before any
+    download, and every run with a gate.yaml checks that the effective configuration
+    equals it. Planted leaks are only allowed on the fixture.
+    """
+    if leak is not None and not fixture:
+        raise GateConfigError("planted leaks are for fixture demonstrations only")
     gate_path = root / GATE_FILE
-    if fixture:
-        gate_hash = None
-    elif gate_path.exists():
-        gate_hash = sha256_file(gate_path)
-    else:
-        raise GateNotFrozenError(
-            f"{GATE_FILE} is not committed yet; freeze the gate before the first full-data "
-            "backtest (docs/design.md section 5)"
-        )
+    freeze: Freeze | None = None
+    if not fixture:
+        freeze = verify_freeze(root)
+    gate = load_gate(gate_path) if gate_path.exists() or not fixture else None
+    if gate is not None:
+        check_configuration(gate, settings, backtest_recipes())
+
     data = ingest(settings.source, cache_dir=settings.cache_dir)
     panel = build_panel(data)
     recipes = backtest_recipes(leak)
     result = run_backtest(panel, settings, recipes)
     name = BACKTEST_FILE if leak is None else f"backtest_leak_{leak}.md"
+    gate_provenance: dict[str, object] = {
+        "gate_sha256": gate.sha256 if gate else None,
+        "gate_freeze_commit": freeze.commit if freeze else None,
+    }
     report = write_report(
         settings.reports_dir,
         name,
-        render_report(result, settings, recipes, data_hash=data.data_hash, gate_hash=gate_hash),
+        render_report(
+            result, settings, recipes, data_hash=data.data_hash, gate=gate, freeze=freeze
+        ),
         settings,
         git_sha(root),
+        extra=gate_provenance,
     )
     return BacktestSummary(result=result, report=report)

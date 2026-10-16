@@ -21,6 +21,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-dev --no-install-project
 
 COPY src ./src
+COPY gate.yaml ./
 COPY data/fixture ./data/fixture
 RUN uv sync --locked --no-dev && chown -R app /app
 

@@ -15,10 +15,11 @@ from forecastgate.backtest import ORACLE, run_backtest, summary, with_oracle
 from forecastgate.cli import app
 from forecastgate.config import FIXTURE_SHA256, DataSource, settings_for
 from forecastgate.errors import DataContractError
+from forecastgate.gate import GateNotFrozenError
 from forecastgate.ingest import ingest
 from forecastgate.metrics import bias, mase, mase_scales, wape
 from forecastgate.panel import WEEK, Panel, build_panel
-from forecastgate.pipeline import GateNotFrozenError, backtest_recipes
+from forecastgate.pipeline import backtest_recipes
 from forecastgate.recipes import FittedRecipe, MovingAverage, Recipe
 
 REPO = Path(__file__).resolve().parents[1]

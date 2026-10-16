@@ -1,0 +1,44 @@
+# Promotion gate and evaluation configuration, frozen before the first full-data backtest
+# (docs/design.md section 5). The full-data backtest refuses to run unless this file is
+# committed, unchanged since that commit, and equal to the configuration the code runs.
+# Any later change is therefore visible in git history, next to the results it affects.
+version: 1
+
+candidate: lgbm
+baselines: [naive, ma4]
+
+universe:
+  size: 200
+  min_size: 50
+  min_history_weeks: 26
+  ranking_window_weeks: 26
+
+folds:
+  count: 6
+  spacing_weeks: 4
+
+horizons: [1, 2, 3, 4]
+
+recipes:
+  naive: {}
+  ma4:
+    window: 4
+  lgbm:
+    objective: tweedie
+    tweedie_variance_power: 1.5
+    n_estimators: 300
+    learning_rate: 0.05
+    num_leaves: 31
+    min_data_in_leaf: 20
+    seed: 0
+    leak: null
+
+# Inequalities between the candidate and the best single baseline (lower pooled WAPE of
+# the baselines), on the same folds. An undefined metric fails its criterion.
+thresholds:
+  pooled_wape_ratio_max: 0.95  # 1. WAPE_pooled(cand) <= 0.95 * WAPE_pooled(base)
+  min_fold_wins: 4  # 2. WAPE_fold(cand) < WAPE_fold(base) in at least 4 folds
+  fold_wape_ratio_max: 1.10  # 3. WAPE_fold(cand) <= 1.10 * WAPE_fold(base) in every fold
+  horizon_wape_ratio_max: 1.00  # 4. WAPE_h(cand) <= WAPE_h(base) for every horizon
+  abs_bias_max: 0.05  # 5. |Bias_pooled(cand)| <= 0.05
+  champion_wape_ratio_max: 0.99  # 6. WAPE_pooled(cand) <= 0.99 * WAPE_pooled(champion)

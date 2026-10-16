@@ -44,7 +44,9 @@ docker run --rm --network none forecastgate uv run forecastgate reproduce --fixt
 | Rolling-origin backtest of `naive`, `ma4` and `lgbm` on truncated panels; WAPE, bias, MASE with edge cases; per-fold oracle | Implemented, tested on the fixture | `tests/test_backtest.py`; `uv run forecastgate backtest --fixture` |
 | Full-data backtest refused until `gate.yaml` is committed | Implemented, tested | `tests/test_backtest.py` |
 | Full-data backtest report | Planned (after the gate freeze) | |
-| Promotion gate, registry, baseline champion | Planned | |
+| Frozen `gate.yaml`: full-data runs require it committed and unchanged; effective config must match | Implemented, tested | `tests/test_gate.py` |
+| Gate criteria evaluated in code, decision in the backtest report | Implemented, tested | `tests/test_gate.py` |
+| Registry, champion promotion, final refit, gate exit codes | Planned | |
 | Read-only serving with freshness checks | Planned | |
 
 At this stage `reproduce` publishes the fixed `ma4` baseline; the gate decides the

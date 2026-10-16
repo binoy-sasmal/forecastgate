@@ -15,6 +15,7 @@ import pandas as pd
 from forecastgate.config import Settings
 from forecastgate.errors import DataContractError
 from forecastgate.folds import backtest_cutoffs
+from forecastgate.gate import Freeze, GateConfig, GateDecision, evaluate
 from forecastgate.metrics import bias, mase, mase_scales, wape
 from forecastgate.panel import WEEK, Panel
 from forecastgate.recipes import Recipe
@@ -159,9 +160,11 @@ def render_report(
     recipes: dict[str, Recipe],
     *,
     data_hash: str,
-    gate_hash: str | None,
+    gate: GateConfig | None,
+    freeze: Freeze | None,
 ) -> str:
     table = summary(result)
+    decision = evaluate(table, gate) if gate is not None else None
     names = [*recipes, ORACLE]
     lines = [
         "# Backtest report",
@@ -181,8 +184,9 @@ def render_report(
         "| Item | Value |",
         "|---|---|",
         f"| Source | `{settings.source.name}`, archive SHA-256 `{data_hash}` |",
-        "| Gate config SHA-256 | "
-        + (f"`{gate_hash}`" if gate_hash else "not frozen (fixture run)")
+        "| Gate config SHA-256 | " + (f"`{gate.sha256}`" if gate else "no gate.yaml") + " |",
+        "| Gate freeze commit | "
+        + (f"`{freeze.commit}`" if freeze else "not verified (fixture run)")
         + " |",
         f"| Horizons | {', '.join(map(str, settings.horizons))} weeks |",
         f"| Universe rule | first sale at least {settings.min_history_weeks} weeks before the "
@@ -247,5 +251,31 @@ def render_report(
                     ]
                     cells.append(_fmt(match.iloc[0][metric]) if len(match) else "n/a")
                 lines.append(f"| {key} | " + " | ".join(cells) + " |")
+    if decision is not None:
+        lines += _gate_section(decision)
     lines.append("")
     return "\n".join(lines)
+
+
+def _gate_section(decision: GateDecision) -> list[str]:
+    verdict = (
+        f"**PROMOTE** `{decision.candidate}`"
+        if decision.promoted
+        else f"**REJECT** `{decision.candidate}`: criteria {', '.join(map(str, decision.failed))} "
+        f"failed; `{decision.champion}` stays champion"
+    )
+    lines = [
+        "",
+        "## Gate",
+        "",
+        f"Candidate `{decision.candidate}` against the best single baseline "
+        f"`{decision.base}` and the champion `{decision.champion}`, with the frozen thresholds",
+        "in `gate.yaml`. The per-fold oracle is reported above but never used here.",
+        "",
+        "| # | Criterion | Result | Check |",
+        "|---:|---|---|---|",
+    ]
+    for c in decision.criteria:
+        lines.append(f"| {c.number} | {c.name} | {'pass' if c.passed else 'FAIL'} | {c.detail} |")
+    lines += ["", f"Decision: {verdict}."]
+    return lines

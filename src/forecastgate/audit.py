@@ -148,8 +148,11 @@ def render_data_audit(
     return "\n".join(lines)
 
 
-def provenance(settings: Settings, git_sha: str) -> dict[str, object]:
+def provenance(
+    settings: Settings, git_sha: str, extra: dict[str, object] | None = None
+) -> dict[str, object]:
     return {
+        **(extra or {}),
         "source": settings.source.name,
         "data_hash": settings.source.sha256,
         "git_sha": git_sha,
@@ -169,7 +172,13 @@ def write_text(path: Path, text: str) -> None:
 
 
 def write_report(
-    reports_dir: Path, name: str, content: str, settings: Settings, git_sha: str
+    reports_dir: Path,
+    name: str,
+    content: str,
+    settings: Settings,
+    git_sha: str,
+    *,
+    extra: dict[str, object] | None = None,
 ) -> Path:
     """Write a deterministic report and record its run provenance under its file name.
 
@@ -185,6 +194,6 @@ def write_report(
         existing = {}
     # A file from before per-report provenance holds a single run's fields at top level.
     records = existing if isinstance(existing, dict) and "git_sha" not in existing else {}
-    records[name] = provenance(settings, git_sha)
+    records[name] = provenance(settings, git_sha, extra)
     write_text(provenance_path, json.dumps(records, indent=2, sort_keys=True) + "\n")
     return path

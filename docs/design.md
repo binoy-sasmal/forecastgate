@@ -191,6 +191,15 @@ and is never the gate bar.
 `gate.yaml` (thresholds, universe rule, folds, recipe configs) is committed **before the
 first full-data evaluation**; the report records that commit.
 
+Enforcement (`gate.py`): a full-data backtest first verifies, before any download, that
+`gate.yaml` is tracked by git and identical to its committed version; the freeze commit is
+the last commit that changed it, not HEAD. Every run with a `gate.yaml` then checks that the
+effective universe rule, folds, horizons and every recipe's parameters equal the file. The
+backtest report and `provenance.json` record the gate's SHA-256 and the freeze commit.
+The criteria below are evaluated in code from the backtest summary; that code is committed
+in the freeze commit too, so the decision rule cannot change after the results are seen
+without the change appearing in history. Planted leaks are refused outside the fixture.
+
 - **Best single baseline:** whichever of `naive` and `ma4` has the lower pooled WAPE on the
   backtest. Both are parameter-free, and choosing the stronger one only raises the bar.
 - **Initial champion:** on a fresh installation the champion is the best single baseline
