@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -334,72 +335,58 @@ def demos(run: Runner, *, docker: bool) -> list[Demo]:
             "`Dockerfile`, `scripts/scan_image_layers.py`",
         )
         repo = run.clone("docker")
+        # A fresh random marker per run: it exists nowhere except the planted config, so
+        # a hit can only come from the credentials (this script's own source cannot match).
+        marker = f"FAKE-LEAK-{uuid.uuid4().hex}"
+        header = f"AUTHORIZATION: basic {marker}-1"
+        url = f"https://{marker}-2@example.invalid/r.git"
         run.command(
             d,
-            'git config --local http.extraheader "AUTHORIZATION: basic FAKE-LEAK-TOKEN-1"',
-            [
-                "git",
-                "config",
-                "--local",
-                "http.extraheader",
-                "AUTHORIZATION: basic FAKE-LEAK-TOKEN-1",
-            ],
+            f'git config --local http.extraheader "{header}"',
+            ["git", "config", "--local", "http.extraheader", header],
+            repo,
+            0,
+        )
+        run.command(
+            d, f"git remote add leaktest {url}", ["git", "remote", "add", "leaktest", url], repo, 0
+        )
+        images = {"final": "forecastgate:leak-demo", "source": "forecastgate:leak-demo-source"}
+        run.command(
+            d,
+            f"docker build -q -t {images['final']} .",
+            ["docker", "build", "-q", "-t", images["final"], "."],
             repo,
             0,
         )
         run.command(
             d,
-            "git remote add leaktest https://FAKE-LEAK-TOKEN-2@example.invalid/r.git",
-            ["git", "remote", "add", "leaktest", "https://FAKE-LEAK-TOKEN-2@example.invalid/r.git"],
-            repo,
-            0,
-        )
-        run.command(
-            d,
-            "docker build -q -t forecastgate:leak-demo .",
-            ["docker", "build", "-q", "-t", "forecastgate:leak-demo", "."],
-            repo,
-            0,
-        )
-        run.command(
-            d,
-            "docker build -q --target source -t forecastgate:leak-demo-source .",
-            [
-                "docker",
-                "build",
-                "-q",
-                "--target",
-                "source",
-                "-t",
-                "forecastgate:leak-demo-source",
-                ".",
-            ],
+            f"docker build -q --target source -t {images['source']} .",
+            ["docker", "build", "-q", "--target", "source", "-t", images["source"], "."],
             repo,
             0,
         )
         scan = [sys.executable, str(REPO / "scripts/scan_image_layers.py")]
-        run.command(
-            d,
-            "uv run python scripts/scan_image_layers.py forecastgate:leak-demo FAKE-LEAK-TOKEN",
-            [*scan, "forecastgate:leak-demo", "FAKE-LEAK-TOKEN"],
-            repo,
-            0,
-        )
-        run.command(
-            d,
-            "uv run python scripts/scan_image_layers.py "
-            "forecastgate:leak-demo-source FAKE-LEAK-TOKEN",
-            [*scan, "forecastgate:leak-demo-source", "FAKE-LEAK-TOKEN"],
-            repo,
-            0,
-        )
-        subprocess.run(
-            ["docker", "rmi", "-f", "forecastgate:leak-demo", "forecastgate:leak-demo-source"],
-            capture_output=True,
-            check=False,
-        )
+        hits = {}
+        for stage, image in images.items():
+            output = run.command(
+                d,
+                f"uv run python scripts/scan_image_layers.py {image} {marker}",
+                [*scan, image, marker],
+                repo,
+                0,
+            )
+            found = re.search(r"(\d+) occurrences", output)
+            hits[stage] = int(found.group(1)) if found else -1
+        subprocess.run(["docker", "rmi", "-f", *images.values()], capture_output=True, check=False)
+        if hits["final"] != 0 or hits["source"] < 1:
+            raise SystemExit(f"credential scan failed: {hits}")
         for i, block in enumerate(d.blocks):
-            d.blocks[i] = re.sub(r"sha256:[0-9a-f]{64}", "sha256:<image id>", block)
+            block = re.sub(r"sha256:[0-9a-f]{64}", "sha256:<image id>", block)
+            d.blocks[i] = block.replace(marker, "FAKE-LEAK-<random>")
+        d.blocks.append(
+            f"# checked: final image {hits['final']} occurrences (must be 0); "
+            f"discarded source stage {hits['source']} (positive control, must be at least 1)"
+        )
         out.append(d)
     return out
 
