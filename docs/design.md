@@ -231,8 +231,24 @@ exit 10 as an expected outcome and continues to publish with the current champio
 baseline on a fresh installation). Any other failure in training, validation or
 publication stops the run.
 
-Registry: MLflow with local SQLite, aliases for promotion. Fallback if it costs too much
-time: a JSON registry with the same interface.
+Registry (implemented in `registry.py`): the planned fallback, a file-based JSON registry,
+chosen over MLflow. Two of the three recipes are parameter-free baselines, and what the
+registry must do here (versions, a `champion` alias, lineage to the gate decision and
+checksummed model files) needs no tracking server or model wrappers. MLflow was not
+added. Each version records recipe, parameters, data and input hashes, gate SHA-256 and
+freeze commit; loading verifies every model file against its registered checksum.
+
+Commands and exit codes:
+
+- `forecastgate gate` (training): backtest, decide, register. On an empty registry the
+  best single baseline is refitted at the publication cutoff and registered as the
+  initial champion. A promoted candidate is refitted and becomes champion. A champion
+  fitted on different input is refitted under its own recipe. Exits 0 on promotion and
+  10 on a quality rejection; every run appends to `decisions.jsonl`.
+- `forecastgate predict` (batch inference): loads the champion, refuses one fitted on
+  different input, and publishes.
+- `forecastgate reproduce`: data audit, gate, predict. A rejection is recorded and
+  publication continues with the champion; any other failure stops the run.
 
 ## 6. Artifacts, publication and serving
 
@@ -323,6 +339,11 @@ Cut order: FastAPI (fall back to a `serve-check` CLI), MLflow (JSON registry), M
 leakage tests, gate and failure tests are never cut.
 
 ## 10. Acceptance criteria
+
+Open item: a full-data run inside the Docker image. The image has no `.git`, so the
+freeze check refuses full-data runs there, by design. The fix is to package verifiable
+freeze metadata into the image at build time, without weakening the configuration
+integrity checks; until then, full-data reproduction is verified in a git checkout only.
 
 - Public GitHub repository with green CI on `main`.
 - From a clean checkout: `uv sync --locked`, then `uv run forecastgate reproduce` downloads with the hash

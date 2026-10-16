@@ -44,6 +44,10 @@ class Settings:
     def cache_dir(self) -> Path:
         return self.artifacts_dir / "cache"
 
+    @property
+    def registry_dir(self) -> Path:
+        return self.artifacts_dir / "registry"
+
 
 def settings_for(*, fixture: bool, root: Path, artifacts_dir: Path | None = None) -> Settings:
     if fixture:

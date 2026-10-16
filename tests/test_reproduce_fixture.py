@@ -23,6 +23,7 @@ def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A minimal copy of the repository layout, so runs never touch the real artifacts."""
     fixture = REPO / "data" / "fixture"
     shutil.copytree(fixture, tmp_path / "data" / "fixture")
+    shutil.copy(REPO / "gate.yaml", tmp_path / "gate.yaml")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FORECASTGATE_GIT_SHA", "test")
     return tmp_path

@@ -183,6 +183,7 @@ def test_zero_transaction_target_week_stops_the_backtest(panel: Panel) -> None:
 @pytest.fixture
 def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     shutil.copytree(REPO / "data" / "fixture", tmp_path / "data" / "fixture")
+    shutil.copy(REPO / "gate.yaml", tmp_path / "gate.yaml")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FORECASTGATE_GIT_SHA", "test")
     return tmp_path

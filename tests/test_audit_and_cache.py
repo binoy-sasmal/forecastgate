@@ -137,6 +137,7 @@ def test_tampered_cache_still_fails_the_raw_contract(tmp_path: Path) -> None:
 @pytest.fixture
 def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     shutil.copytree(REPO / "data" / "fixture", tmp_path / "data" / "fixture")
+    shutil.copy(REPO / "gate.yaml", tmp_path / "gate.yaml")
     monkeypatch.chdir(tmp_path)
     return tmp_path
 

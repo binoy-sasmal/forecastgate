@@ -23,6 +23,9 @@ from forecastgate.ingest import sha256_file
 from forecastgate.recipes import Recipe
 
 GATE_FILE = "gate.yaml"
+# Exit code of `forecastgate gate` when the candidate fails the criteria. A quality
+# rejection is an expected outcome, distinct from the error codes in errors.py.
+GATE_REJECTED_EXIT = 10
 TOP_LEVEL_KEYS = {
     "version",
     "candidate",

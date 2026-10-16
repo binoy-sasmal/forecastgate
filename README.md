@@ -17,6 +17,8 @@ uv sync --locked
 uv run pytest                                # offline
 uv run forecastgate reproduce --fixture      # offline, on the committed data slice
 uv run forecastgate backtest --fixture       # offline backtest of every recipe
+uv run forecastgate gate --fixture           # training: backtest, gate, register (exit 10 = rejected)
+uv run forecastgate predict --fixture        # batch inference: publish the champion
 uv run forecastgate reproduce                # downloads the full dataset (hash-pinned)
 ```
 
@@ -46,11 +48,18 @@ docker run --rm --network none forecastgate uv run forecastgate reproduce --fixt
 | Full-data backtest report | Planned (after the gate freeze) | |
 | Frozen `gate.yaml`: full-data runs require it committed and unchanged; effective config must match | Implemented, tested | `tests/test_gate.py` |
 | Gate criteria evaluated in code, decision in the backtest report | Implemented, tested | `tests/test_gate.py` |
-| Registry, champion promotion, final refit, gate exit codes | Planned | |
+| JSON registry with `champion` alias and checksummed models; baseline as initial champion; refit at the publication cutoff | Implemented, tested | `tests/test_registry.py` |
+| `gate` exits 10 on rejection with the alias unchanged; `reproduce` still publishes the champion | Implemented, tested | `tests/test_registry.py` |
+| Full-data run inside Docker | Open: the image cannot verify the gate freeze yet | |
 | Read-only serving with freshness checks | Planned | |
 
-At this stage `reproduce` publishes the fixed `ma4` baseline; the gate decides the
-champion once it exists.
+## First full-data evaluation
+
+Against the gate frozen at commit `2bc7216`, `lgbm` reduced pooled backtest WAPE by 1.9%
+relative to the 4-week moving average (0.6096 vs 0.6212) but did not satisfy the
+promotion criteria: below the 5% pooled bar, 3 of 6 folds won, and worse at horizons 1
+and 3. `ma4` is the registered champion and `reproduce` publishes its forecasts. See
+[reports/backtest.md](reports/backtest.md).
 
 ## Data
 

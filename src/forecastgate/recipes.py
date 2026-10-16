@@ -27,8 +27,14 @@ def postprocess(predictions: pd.DataFrame) -> pd.DataFrame:
 
 
 class FittedRecipe(ABC):
+    kind: str  # serialisation format, see `load_fitted`
+
     def __init__(self, cutoff: pd.Timestamp) -> None:
         self.cutoff = cutoff
+
+    @abstractmethod
+    def payload(self) -> dict[str, bytes]:
+        """Files that reproduce this fitted model exactly when passed to `load_fitted`."""
 
     def predict(self, panel: Panel, universe: list[str], horizons: tuple[int, ...]) -> pd.DataFrame:
         if panel.last_complete_week != self.cutoff:
@@ -69,9 +75,19 @@ class Recipe(ABC):
 class _LevelForecast(FittedRecipe):
     """A flat forecast: one level per product, repeated for every horizon."""
 
+    kind = "levels"
+
     def __init__(self, cutoff: pd.Timestamp, levels: pd.Series) -> None:
         super().__init__(cutoff)
         self.levels = levels
+
+    def payload(self) -> dict[str, bytes]:
+        # repr() of a float round-trips exactly, so a reloaded model predicts identically.
+        lines = ["stock_code,level"]
+        lines += [
+            f"{code},{float(level)!r}" for code, level in sorted(self.levels.dropna().items())
+        ]
+        return {"levels.csv": ("\n".join(lines) + "\n").encode("utf-8")}
 
     def _predict(
         self, panel: Panel, universe: list[str], horizons: tuple[int, ...]
@@ -164,10 +180,15 @@ class LightGBM(Recipe):
 
 
 class _LightGBMForecast(FittedRecipe):
+    kind = "lightgbm"
+
     def __init__(self, cutoff: pd.Timestamp, model: lgb.Booster, training_rows: int) -> None:
         super().__init__(cutoff)
         self.model = model
         self.training_rows = training_rows
+
+    def payload(self) -> dict[str, bytes]:
+        return {"model.txt": self.model.model_to_string().encode("utf-8")}
 
     def _predict(
         self, panel: Panel, universe: list[str], horizons: tuple[int, ...]
@@ -187,3 +208,16 @@ class _LightGBMForecast(FittedRecipe):
 
 
 RECIPES: dict[str, type[Recipe]] = {"naive": Naive, "ma4": MovingAverage, "lgbm": LightGBM}
+
+
+def load_fitted(kind: str, cutoff: pd.Timestamp, files: dict[str, bytes]) -> FittedRecipe:
+    """Rebuild a fitted model from `FittedRecipe.payload` output."""
+    if kind == _LevelForecast.kind:
+        rows = files["levels.csv"].decode("utf-8").splitlines()[1:]
+        pairs = [row.split(",") for row in rows]
+        levels = pd.Series({code: float(level) for code, level in pairs}, dtype="float64")
+        return _LevelForecast(cutoff, levels)
+    if kind == _LightGBMForecast.kind:
+        booster = lgb.Booster(model_str=files["model.txt"].decode("utf-8"))
+        return _LightGBMForecast(cutoff, booster, training_rows=-1)
+    raise ValueError(f"unknown fitted model kind {kind!r}")
