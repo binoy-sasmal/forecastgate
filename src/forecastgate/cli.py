@@ -1,12 +1,14 @@
 """Command-line interface. This is the only official way to run the pipeline.
 
-Exit codes: 0 success; 10 the gate rejected the candidate (`gate` only); 2 to 9 an
-explained failure (see errors.py, gate.py and registry.py); 1 an unexpected error.
+Exit codes: 0 success; 10 the gate rejected the candidate (`gate` only); 2 to 9 and 11
+an explained failure (see errors.py, gate.py, registry.py and serving.py); 1 an
+unexpected error.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -18,6 +20,7 @@ from forecastgate.gate import GATE_REJECTED_EXIT
 from forecastgate.pipeline import GateOutcome, PredictOutcome, gate_command, predict_command
 from forecastgate.pipeline import backtest as run_backtest
 from forecastgate.pipeline import reproduce as run_reproduce
+from forecastgate.serving import load_current
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -121,6 +124,65 @@ def backtest(
     for fold in summary.result.folds:
         _line(f"fold {fold.index}", f"{fold.cutoff:%Y-%m-%d}, {fold.universe_size} products")
     _line("report", summary.report)
+
+
+AsOfOption = Annotated[
+    str,
+    typer.Option(
+        "--as-of",
+        help="Simulated current date, YYYY-MM-DD. The data is historical, so it is explicit.",
+    ),
+]
+MaxAgeOption = Annotated[
+    int, typer.Option(help="Oldest servable artifact, in days after its data ends.")
+]
+
+
+def _as_of(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise typer.BadParameter(f"{value!r} is not a YYYY-MM-DD date") from exc
+
+
+@app.command("serve-check")
+def serve_check(
+    as_of: AsOfOption,
+    fixture: FixtureOption = False,
+    artifacts_dir: ArtifactsOption = None,
+    max_age_days: MaxAgeOption = 7,
+) -> None:
+    """Validate what serving would serve right now. Exits 11 if it would refuse."""
+    _, settings = _settings(fixture, artifacts_dir)
+    served = _run(
+        lambda: load_current(
+            settings.predictions_dir, as_of=_as_of(as_of), max_age_days=max_age_days
+        )
+    )
+    _line("serving", f"{served.identity} ({served.manifest['identity']['model_version']})")
+    _line("data through", f"{served.data_through}, {served.age_days} days before {as_of}")
+    _line("products", served.predictions["stock_code"].nunique())
+
+
+@app.command()
+def serve(
+    as_of: AsOfOption,
+    fixture: FixtureOption = False,
+    artifacts_dir: ArtifactsOption = None,
+    max_age_days: MaxAgeOption = 7,
+    host: Annotated[str, typer.Option()] = "127.0.0.1",
+    port: Annotated[int, typer.Option()] = 8000,
+) -> None:
+    """Read-only HTTP API over the published artifact (GET /health, /predictions/{code})."""
+    import uvicorn
+
+    from forecastgate.api import create_app
+
+    _, settings = _settings(fixture, artifacts_dir)
+    application = create_app(
+        settings.predictions_dir, as_of=_as_of(as_of), max_age_days=max_age_days
+    )
+    uvicorn.run(application, host=host, port=port)
 
 
 def main() -> None:
