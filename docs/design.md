@@ -283,11 +283,16 @@ runs. A new model or config version has a new identity and is a normal new artif
 **Prediction contract:** exactly universe(T) x {1, 2, 3, 4} rows, unique keys, target week
 equals T + h, values finite and `>= 0`, cutoff equal to the manifest's.
 
-**Serving** (FastAPI, optional, see section 9) reads `CURRENT`, verifies checksums, and
-checks freshness against a simulated `as_of` clock (`0 <= as_of - T <= max_age`, so
-future-dated artifacts are refused too). Stale,
-missing or mismatched artifacts return 503 with the reason; it never falls back silently.
-`/health` reports the identity served.
+**Serving** (implemented: `serving.py`, `api.py`; `forecastgate serve` and
+`forecastgate serve-check`) is read-only and re-validates on every request: it resolves
+`CURRENT`, requires a committed artifact whose manifest names it, verifies the
+predictions file against the manifest checksum, re-checks the content (rows, keys,
+cutoff, target weeks, finite non-negative values), and checks freshness against a
+simulated `as_of` date. An artifact for cutoff week T covers data through T + 6 days (the
+Sunday); it is served only if `0 <= as_of - (T + 6 days) <= max_age_days` (default 7), so
+stale and future-dated artifacts are both refused. A refusal is a 503 with the reason
+(`serve-check` exits 11); serving never falls back to an older artifact. `/health`
+reports the identity, model version and age served.
 
 ## 7. Failure demonstrations
 
@@ -340,10 +345,19 @@ leakage tests, gate and failure tests are never cut.
 
 ## 10. Acceptance criteria
 
-Open item: a full-data run inside the Docker image. The image has no `.git`, so the
-freeze check refuses full-data runs there, by design. The fix is to package verifiable
-freeze metadata into the image at build time, without weakening the configuration
-integrity checks; until then, full-data reproduction is verified in a git checkout only.
+Full-data runs inside the Docker image: the image carries the repository's `.git` and
+the full working tree, so the freeze is verified there by the same check as in a
+checkout and provenance records the real commit and `git_dirty`; nothing is bypassed,
+and editing `gate.yaml` inside a container is refused. The manual CI job
+`full-data-docker` runs the full `reproduce` in the image and requires the regenerated
+deterministic reports to equal the committed ones (configured; it has not run on GitHub).
+
+Tradeoff, accepted for a local portfolio project: shipping `.git` makes the image larger
+and exposes the repository history inside it, in exchange for a freeze check that is the
+same code path as in a checkout rather than a separate, weaker manifest. The build context
+excludes downloaded data, caches, local registries, artifacts and credential files, and
+the image drops git remotes and credential settings from its copied config. A production
+image would instead ship a signed freeze attestation and no history.
 
 - Public GitHub repository with green CI on `main`.
 - From a clean checkout: `uv sync --locked`, then `uv run forecastgate reproduce` downloads with the hash

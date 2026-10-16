@@ -19,6 +19,8 @@ uv run forecastgate reproduce --fixture      # offline, on the committed data sl
 uv run forecastgate backtest --fixture       # offline backtest of every recipe
 uv run forecastgate gate --fixture           # training: backtest, gate, register (exit 10 = rejected)
 uv run forecastgate predict --fixture        # batch inference: publish the champion
+uv run forecastgate serve-check --fixture --as-of 2011-12-05   # what serving would serve
+uv run forecastgate serve --fixture --as-of 2011-12-05         # read-only API on :8000
 uv run forecastgate reproduce                # downloads the full dataset (hash-pinned)
 ```
 
@@ -27,6 +29,7 @@ Docker:
 ```sh
 docker build -t forecastgate .
 docker run --rm --network none forecastgate uv run forecastgate reproduce --fixture
+docker run --rm forecastgate uv run forecastgate reproduce      # full data; downloads the archive
 ```
 
 ## Status
@@ -50,8 +53,9 @@ docker run --rm --network none forecastgate uv run forecastgate reproduce --fixt
 | Gate criteria evaluated in code, decision in the backtest report | Implemented, tested | `tests/test_gate.py` |
 | JSON registry with `champion` alias and checksummed models; baseline as initial champion; refit at the publication cutoff | Implemented, tested | `tests/test_registry.py` |
 | `gate` exits 10 on rejection with the alias unchanged; `reproduce` still publishes the champion | Implemented, tested | `tests/test_registry.py` |
-| Full-data run inside Docker | Open: the image cannot verify the gate freeze yet | |
-| Read-only serving with freshness checks | Planned | |
+| Full-data `reproduce` inside Docker, freeze verified from packaged git metadata; reports byte-identical to the committed ones | Implemented, verified locally in the image | manual CI job `full-data-docker` (configured, not yet verified) |
+| GitHub Actions CI: lint, types, tests, fixture runs locally and in Docker | Configured, not yet verified: it has not run on GitHub | `.github/workflows/ci.yml` |
+| Read-only serving: stale, future-dated, tampered or inconsistent artifacts refused with 503 | Implemented, tested | `tests/test_serving.py`; `forecastgate serve`, `forecastgate serve-check` |
 
 ## First full-data evaluation
 

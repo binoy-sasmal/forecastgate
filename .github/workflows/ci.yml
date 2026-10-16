@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,8 +31,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: docker build --build-arg GIT_SHA=${{ github.sha }} -t forecastgate .
+      - run: docker build -t forecastgate .
       - name: Offline fixture pipeline in the image
         run: docker run --rm --network none forecastgate uv run forecastgate reproduce --fixture
       - name: Offline fixture backtest in the image
         run: docker run --rm --network none forecastgate uv run forecastgate backtest --fixture
+
+  # Full-data acceptance in the image: downloads the pinned archive, verifies the gate
+  # freeze from the packaged git metadata, and checks that the regenerated deterministic
+  # reports equal the committed ones. Manual, because it depends on the UCI download.
+  full-data-docker:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # the freeze check needs the commit that last changed gate.yaml
+      - run: docker build -t forecastgate .
+      - name: Full-data reproduce in the image, reports must match the committed ones
+        run: >
+          docker run --rm forecastgate sh -c
+          "uv run forecastgate reproduce &&
+          git diff --exit-code -- reports/data_audit.md reports/backtest.md"

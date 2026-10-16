@@ -1,8 +1,21 @@
-.git
+# Build context exclusions. .git is deliberately included: the image verifies the gate
+# freeze and records provenance from it (a documented tradeoff, see docs/design.md).
+
+# Downloaded data, caches, local registries and published artifacts
+data/raw
+artifacts
+
+# Environments and tool caches
 .venv
 .mypy_cache
 .pytest_cache
 .ruff_cache
 **/__pycache__
-artifacts
-data/raw
+
+# Credentials, should any ever appear in the working tree
+.env
+.env.*
+**/*.pem
+**/*.key
+**/.netrc
+**/credentials*
