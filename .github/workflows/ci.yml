@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.13.1"
@@ -31,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - run: docker build -t forecastgate .
       - name: Offline fixture pipeline in the image
         run: docker run --rm --network none forecastgate uv run forecastgate reproduce --fixture
@@ -47,6 +51,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # the freeze check needs the commit that last changed gate.yaml
+          persist-credentials: false  # no token in .git/config, even in the build context
       - run: docker build -t forecastgate .
       - name: Full-data reproduce in the image, reports must match the committed ones
         run: >

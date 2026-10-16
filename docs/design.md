@@ -355,9 +355,13 @@ deterministic reports to equal the committed ones (configured; it has not run on
 Tradeoff, accepted for a local portfolio project: shipping `.git` makes the image larger
 and exposes the repository history inside it, in exchange for a freeze check that is the
 same code path as in a checkout rather than a separate, weaker manifest. The build context
-excludes downloaded data, caches, local registries, artifacts and credential files, and
-the image drops git remotes and credential settings from its copied config. A production
-image would instead ship a signed freeze attestation and no history.
+excludes downloaded data, caches, local registries, artifacts and credential files. The
+context's `.git` is read only by a discarded build stage, which passes on just `HEAD`,
+objects, refs and the index with a freshly written config; the original config (remote
+URLs, credential helpers, extra headers), reflogs and hooks reach no layer of the final
+image. Deleting them in a later layer would not have been enough, since earlier layers
+keep them. CI checkouts use `persist-credentials: false`. A production image would
+instead ship a signed freeze attestation and no history.
 
 - Public GitHub repository with green CI on `main`.
 - From a clean checkout: `uv sync --locked`, then `uv run forecastgate reproduce` downloads with the hash
