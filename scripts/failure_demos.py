@@ -408,7 +408,8 @@ def render(items: list[Demo], *, commit: str, dirty: bool, docker: bool, full: b
         "refused; 6 publication lock held; 7 gate not frozen; 8 gate config mismatch; 9",
         "registry (no or stale champion); 10 gate rejected the candidate; 11 serving refused.",
         "",
-        "These are local runs. GitHub Actions CI is configured but has not run yet.",
+        "These demonstrations are local runs. GitHub Actions CI status, with links to runs,",
+        "is recorded in the README.",
     ]
     if not full:
         lines += ["", "Full-data steps were skipped: the downloaded archive was not present."]
