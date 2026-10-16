@@ -122,5 +122,6 @@ production image would ship a signed freeze attestation and no history.
 
 `.github/workflows/ci.yml` runs Ruff, mypy, pytest, the fixture `reproduce` and
 `backtest` locally and in the image, and a manual `full-data-docker` job that requires
-the regenerated reports to equal the committed ones. It is configured but has not run
-on GitHub yet; everything above was verified locally.
+the regenerated reports to equal the committed ones. Both passed at commit `9b4aa84`:
+[push run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38970499923) and [full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356). The credential scan of image layers is
+run locally, not in CI.

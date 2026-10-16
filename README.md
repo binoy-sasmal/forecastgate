@@ -9,9 +9,10 @@ that refuses stale or tampered artifacts.
 It runs on a public dataset with a historical clock. It has no live users and makes no
 claim about production scale or business impact.
 
-> **Status.** Everything in the table below marked implemented was verified locally, on
-> Windows and in the Linux Docker image. GitHub Actions CI is **configured, not yet
-> verified**: it has not run on GitHub.
+> **Status.** Verified locally (Windows and the Linux Docker image) and by GitHub Actions
+> at commit `9b4aa84`: the [push run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38970499923) (lint, types, 133 tests, fixture runs locally
+> and in the image) and the manually triggered [full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) (full `reproduce`
+> in the image, freeze verified, reports byte-identical to the committed ones).
 
 ## Problem
 
@@ -105,9 +106,9 @@ Every failure case below is demonstrated with real commands, exit codes and outp
 | Registry, baseline as initial champion, exit 10 on rejection, weak model blocked | Implemented, tested | `tests/test_registry.py` |
 | Atomic, idempotent publication; inconsistent reruns refused | Implemented, tested | `tests/test_publish.py` |
 | Read-only serving refuses stale, future-dated, tampered or inconsistent artifacts | Implemented, tested | `tests/test_serving.py` |
-| Full-data `reproduce` in Docker, freeze verified in the image, reports byte-identical | Verified locally in the image | provenance at commit `02b63d7` |
-| No git credentials in any image layer | Verified locally | [docs/failures.md](docs/failures.md), demonstration 7 |
-| GitHub Actions CI, including the manual `full-data-docker` job | Configured, not yet verified | `.github/workflows/ci.yml` |
+| Full-data `reproduce` in Docker, freeze verified in the image, reports byte-identical | Verified locally and in CI | provenance at commit `02b63d7`; [CI full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) at `9b4aa84` |
+| No git credentials in any image layer | Verified locally (not part of CI) | [docs/failures.md](docs/failures.md), demonstration 7 |
+| GitHub Actions CI: lint, types, 133 tests, fixture runs locally and in Docker; manual full-data job | Passed at `9b4aa84` | [push run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38970499923), [full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) |
 
 ## Limitations
 
@@ -134,7 +135,8 @@ Every failure case below is demonstrated with real commands, exit codes and outp
   claimed about where its gains or losses occur.
 - **Engineering scope.** Single machine; a file-based JSON registry rather than MLflow;
   one publisher at a time. The Docker image ships git history as a reproducibility
-  tradeoff (see [docs/architecture.md](docs/architecture.md)). CI has not run on GitHub.
+  tradeoff (see [docs/architecture.md](docs/architecture.md)). The full-data CI job is
+  triggered manually because it depends on the UCI download.
 
 ## Data and licence
 

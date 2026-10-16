@@ -8,26 +8,28 @@ the links before using a fact.
 
 - **Local:** run and checked on the author's Windows machine.
 - **Image:** run and checked in the Linux Docker image built from a clean commit.
-- **CI:** run by GitHub Actions. *No claim in this file has CI verification yet:* the
-  workflow is configured but has not run on GitHub.
+- **CI:** run by GitHub Actions at commit `9b4aa84`: the [push run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38970499923) (Ruff,
+  mypy, 133 tests, fixture `reproduce` and `backtest` on the runner and in the image) and
+  the manually triggered [full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) (full `reproduce` in the image, freeze
+  verified, `git diff --exit-code` on both committed reports).
 
 ## Claims
 
 | # | Claim | Evidence | Verified |
 |---:|---|---|---|
-| 1 | Built a reproducible batch forecasting pipeline: a clean checkout regenerates the data audit and backtest report byte-identically | [reports/data_audit.md](../reports/data_audit.md), [reports/backtest.md](../reports/backtest.md), [reports/provenance.json](../reports/provenance.json) (commit `02b63d7`, `git_dirty: false`) | Local, Image |
-| 2 | Enforced data contracts on raw input: hash pin, schema checks per sheet, an exact-match rule for the overlapping sheets, and audited exclusions | `tests/test_ingest.py`, `tests/test_audit_and_cache.py`; [failures.md](failures.md) #1 | Local |
-| 3 | Found and fixed a data-preparation defect: lower-case and whitespace variants of stock codes that split one product into several series (5,305 distinct codes before normalisation, 5,131 after) | [reports/data_audit.md](../reports/data_audit.md) (stock code normalisation), commit `3746cba` | Local |
-| 4 | Evaluated with leakage-safe rolling-origin backtesting: training labels need `t + h <= T`, recipes only see data up to each cutoff, and two planted leaks are detected by tests | `tests/test_leakage.py`, `tests/test_features.py`, `tests/test_backtest.py`; [failures.md](failures.md) #2 | Local |
-| 5 | Compared a LightGBM model against naive and moving-average baselines with WAPE, bias and MASE, per fold and per horizon | [reports/backtest.md](../reports/backtest.md) | Local, Image |
-| 6 | Pre-registered the promotion criteria: the gate config was committed before the first full-data evaluation, and full-data runs refuse a gate that is uncommitted or edited | commits `2bc7216` (freeze) then `d00b5d1` (first evaluation); `tests/test_gate.py`; [failures.md](failures.md) #4 | Local, Image |
-| 7 | The gate rejected a LightGBM model that lowered pooled backtest WAPE by 1.9% but missed the 5% bar, won 3 of 6 folds and was worse at two horizons; a baseline stayed champion | [reports/backtest.md](../reports/backtest.md) (Gate section); [failures.md](failures.md) #3 | Local, Image |
-| 8 | Built a model registry with a champion alias, lineage to the gate decision, and checksummed model files | `src/forecastgate/registry.py`, `tests/test_registry.py` | Local |
-| 9 | Published predictions atomically and idempotently: staged validation, a lock, a pointer swap, and refusal of same-identity reruns with different content | `tests/test_publish.py`; [failures.md](failures.md) #5 | Local |
-| 10 | Served forecasts read-only through FastAPI, refusing stale, future-dated and tampered artifacts with a 503 and the reason | `tests/test_serving.py`; [failures.md](failures.md) #6 | Local |
-| 11 | Separated training, batch inference and serving into commands that share only checksummed files | [architecture.md](architecture.md); `forecastgate gate`, `predict`, `serve` | Local |
-| 12 | Containerised every command; the image verifies the gate freeze itself and carries no git credentials in any layer | `Dockerfile`, `scripts/scan_image_layers.py`; [failures.md](failures.md) #7 | Image |
-| 13 | Test suite of 133 tests; each core guard was also checked by planting a bug and confirming a test fails | `tests/`; the planted-bug checks are described in the commit history, not in a committed script | Local |
+| 1 | Built a reproducible batch forecasting pipeline: a clean checkout regenerates the data audit and backtest report byte-identically | [reports/data_audit.md](../reports/data_audit.md), [reports/backtest.md](../reports/backtest.md), [reports/provenance.json](../reports/provenance.json) (commit `02b63d7`, `git_dirty: false`); [CI full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) | Local, Image, CI |
+| 2 | Enforced data contracts on raw input: hash pin, schema checks per sheet, an exact-match rule for the overlapping sheets, and audited exclusions | `tests/test_ingest.py`, `tests/test_audit_and_cache.py`; [failures.md](failures.md) #1 | Local, CI |
+| 3 | Found and fixed a data-preparation defect: lower-case and whitespace variants of stock codes that split one product into several series (5,305 distinct codes before normalisation, 5,131 after) | [reports/data_audit.md](../reports/data_audit.md) (stock code normalisation), commit `3746cba`; regenerated identically in the [CI full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) | Local, CI |
+| 4 | Evaluated with leakage-safe rolling-origin backtesting: training labels need `t + h <= T`, recipes only see data up to each cutoff, and two planted leaks are detected by tests | `tests/test_leakage.py`, `tests/test_features.py`, `tests/test_backtest.py`; [failures.md](failures.md) #2 | Local, CI |
+| 5 | Compared a LightGBM model against naive and moving-average baselines with WAPE, bias and MASE, per fold and per horizon | [reports/backtest.md](../reports/backtest.md); regenerated identically in the [CI full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) | Local, Image, CI |
+| 6 | Pre-registered the promotion criteria: the gate config was committed before the first full-data evaluation, and full-data runs refuse a gate that is uncommitted or edited | commits `2bc7216` (freeze) then `d00b5d1` (first evaluation); `tests/test_gate.py`; [failures.md](failures.md) #4; freeze verified in the [CI full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) | Local, Image, CI |
+| 7 | The gate rejected a LightGBM model that lowered pooled backtest WAPE by 1.9% but missed the 5% bar, won 3 of 6 folds and was worse at two horizons; a baseline stayed champion | [reports/backtest.md](../reports/backtest.md) (Gate section); [failures.md](failures.md) #3; executed in the [CI full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) | Local, Image, CI |
+| 8 | Built a model registry with a champion alias, lineage to the gate decision, and checksummed model files | `src/forecastgate/registry.py`, `tests/test_registry.py` | Local, CI |
+| 9 | Published predictions atomically and idempotently: staged validation, a lock, a pointer swap, and refusal of same-identity reruns with different content | `tests/test_publish.py`; [failures.md](failures.md) #5 | Local, CI |
+| 10 | Served forecasts read-only through FastAPI, refusing stale, future-dated and tampered artifacts with a 503 and the reason | `tests/test_serving.py`; [failures.md](failures.md) #6 | Local, CI |
+| 11 | Separated training, batch inference and serving into commands that share only checksummed files | [architecture.md](architecture.md); `forecastgate gate`, `predict`, `serve` | Local; `gate` and `predict` also run inside `reproduce` in CI |
+| 12 | Containerised every command; the image verifies the gate freeze itself and carries no git credentials in any layer | `Dockerfile`, `scripts/scan_image_layers.py`; [failures.md](failures.md) #7 | Image (the credential scan is not part of CI; the image build and runs are) |
+| 13 | Test suite of 133 tests; each core guard was also checked by planting a bug and confirming a test fails | `tests/`, 133 passed in the [CI push run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38970499923); the planted-bug checks are described in the commit history, not in a committed script | Local, CI (tests); local only (planted bugs) |
 
 ## Numbers safe to quote
 
@@ -51,7 +53,8 @@ Do not claim any of these; the evidence does not support them.
   users. The target is recorded sales on historical data.
 - Production scale, scheduled retraining, monitoring or drift detection. None exist.
 - MLflow. The registry is a JSON registry by design.
-- Green CI or CI-verified results. CI has not run.
+- CI verification beyond what the two linked runs at `9b4aa84` show (for example, the
+  credential scan, which runs locally only).
 - Hyperparameter tuning. Parameters were fixed and not tuned.
 
 ## Suggested résumé bullets

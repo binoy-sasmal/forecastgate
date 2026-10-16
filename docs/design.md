@@ -350,7 +350,7 @@ the full working tree, so the freeze is verified there by the same check as in a
 checkout and provenance records the real commit and `git_dirty`; nothing is bypassed,
 and editing `gate.yaml` inside a container is refused. The manual CI job
 `full-data-docker` runs the full `reproduce` in the image and requires the regenerated
-deterministic reports to equal the committed ones (configured; it has not run on GitHub).
+deterministic reports to equal the committed ones (passed at `9b4aa84`: [run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356)).
 
 Tradeoff, accepted for a local portfolio project: shipping `.git` makes the image larger
 and exposes the repository history inside it, in exchange for a freeze check that is the
