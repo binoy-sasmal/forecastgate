@@ -3,9 +3,9 @@
     "data_hash": "572e36277c2390fbfde10664750731e0a86f55e33470d91919085f0408e67bfb",
     "gate_freeze_commit": "2bc7216eb03a01b5a486dc0925dee865b8ed66c9",
     "gate_sha256": "7623839e13ba8776898376a110fc74913d373b37522b29f0cbc328897278eca4",
-    "generated_at": "2026-10-16T13:38:55Z",
+    "generated_at": "2026-10-16T14:00:38Z",
     "git_dirty": false,
-    "git_sha": "829b7e6dd6219e4521e30b69fb27b09e0d28667f",
+    "git_sha": "02b63d7fb6249f3698ddd9ba739caf4fde797518",
     "packages": {
       "lightgbm": "4.7.0",
       "numpy": "2.5.4",
@@ -21,9 +21,9 @@
   },
   "data_audit.md": {
     "data_hash": "572e36277c2390fbfde10664750731e0a86f55e33470d91919085f0408e67bfb",
-    "generated_at": "2026-10-16T13:38:44Z",
+    "generated_at": "2026-10-16T14:00:27Z",
     "git_dirty": false,
-    "git_sha": "829b7e6dd6219e4521e30b69fb27b09e0d28667f",
+    "git_sha": "02b63d7fb6249f3698ddd9ba739caf4fde797518",
     "packages": {
       "lightgbm": "4.7.0",
       "numpy": "2.5.4",
