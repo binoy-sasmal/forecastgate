@@ -1,8 +1,25 @@
-# Application evidence
+# Application Evidence: forecastgate
 
 A claim-and-evidence map for using this project in job applications. It routes each
 claim to the report, test or commit that supports it; it is not itself evidence. Follow
 the links before using a fact.
+
+## Status
+
+Complete. The authoritative status is the "What is verified" table and the limitations in
+the [README](../README.md). The frozen thresholds in [gate.yaml](../gate.yaml) and the
+rejected-model result are final for this project.
+
+## What it demonstrates
+
+- Leakage-safe rolling-origin backtesting of a learned model against naive and
+  moving-average baselines.
+- Promotion criteria pre-registered in git before the first evaluation, enforced in code,
+  and honoured when they rejected the candidate.
+- Data contracts and a generated data audit on a real, messy public dataset.
+- A model registry, atomic versioned batch publication and read-only serving, each with
+  its failure paths demonstrated.
+- Reproducibility: byte-identical reports on Windows, in a Linux image and in CI.
 
 **Verification levels used below**
 
@@ -13,7 +30,7 @@ the links before using a fact.
   the manually triggered [full-data run](https://github.com/binoy-sasmal/forecastgate/actions/runs/38971080356) (full `reproduce` in the image, freeze
   verified, `git diff --exit-code` on both committed reports).
 
-## Claims
+## Evidence map
 
 | # | Claim | Evidence | Verified |
 |---:|---|---|---|
@@ -41,7 +58,7 @@ All from [reports/backtest.md](../reports/backtest.md) and
 - 1,067,371 rows across the two sheets (1,044,848 after the overlap rule); 1,003,214
   sales rows after exclusions; 104 complete weeks; 200 products per fold.
 
-## Unsafe framings
+## Unsupported claims
 
 Do not claim any of these; the evidence does not support them.
 
@@ -57,7 +74,7 @@ Do not claim any of these; the evidence does not support them.
   credential scan, which runs locally only).
 - Hyperparameter tuning. Parameters were fixed and not tuned.
 
-## Suggested résumé bullets
+## Safe application framing
 
 Each bullet uses only claims above; numbers come from the committed reports.
 
@@ -70,3 +87,10 @@ Each bullet uses only claims above; numbers come from the committed reports.
 - Implemented a model registry, atomic versioned batch publication and read-only serving
   that refuses stale or tampered prediction artifacts, with each failure path
   demonstrated and tested.
+
+## Verification rule
+
+Before using a number, open the report it comes from at the commit you are citing and
+confirm it there. Before claiming CI verification, confirm the linked run's commit SHA and
+that it passed. Record the repository commit used in the application analysis rather than
+relying on any commit named in this file as current.
