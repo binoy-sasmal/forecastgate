@@ -1,27 +1,75 @@
 # forecastgate
 
-Weekly sales forecasting for an online retailer, built to show production-oriented ML
-engineering: data contracts, leakage-safe backtesting against baselines, a promotion gate,
-and versioned, atomically published batch predictions.
+A batch forecasting pipeline for weekly sales of an online retailer, built to show
+production-oriented ML engineering rather than model sophistication: data contracts,
+leakage-safe backtesting against baselines, a promotion gate frozen before the first
+evaluation, a model registry, atomically published predictions, and read-only serving
+that refuses stale or tampered artifacts.
 
-**Status: under construction.** The design is in [docs/design.md](docs/design.md). Only
-what the table below marks as implemented exists.
+It runs on a public dataset with a historical clock. It has no live users and makes no
+claim about production scale or business impact.
+
+> **Status.** Everything in the table below marked implemented was verified locally, on
+> Windows and in the Linux Docker image. GitHub Actions CI is **configured, not yet
+> verified**: it has not run on GitHub.
+
+## Problem
+
+Forecast weekly recorded sales quantity per product, 1 to 4 weeks ahead, from a fixed
+cutoff, and publish the forecasts as a versioned batch artifact. Data: UCI *Online Retail
+II*, about 1.07M invoice lines from a UK online retailer, December 2009 to December 2011.
+The forecast universe at each cutoff is the 200 highest-volume products with at least 26
+weeks of history.
+
+## Result of the first frozen evaluation
+
+The promotion criteria were committed in [gate.yaml](gate.yaml) (commit `2bc7216`)
+before any full-data evaluation ran. Six rolling-origin folds, June to November 2011:
+
+| Recipe | Pooled WAPE | Pooled bias | MASE |
+|---|---:|---:|---:|
+| `naive` (last observed week) | 0.7930 | +0.062 | 1.203 |
+| `ma4` (4-week moving average) | 0.6212 | −0.033 | 0.944 |
+| `lgbm` (global LightGBM) | 0.6096 | +0.025 | 0.952 |
+
+LightGBM reduced pooled backtest WAPE by 1.9% relative to `ma4`, but it did not satisfy
+the promotion criteria: the improvement is below the 5% bar, it won 3 of 6 folds where 4
+are required, and it was worse at horizons 1 and 3. The gate rejected it (`forecastgate
+gate` exits 10), `ma4` is the registered champion, and `reproduce` publishes its
+forecasts. Full report: [reports/backtest.md](reports/backtest.md).
+
+## Architecture
+
+```
+archive (hash-pinned) -> ingest -> weekly panel -> backtest -> gate -> registry
+                                        |                                 |
+                                   data audit                      predict -> publish -> serve
+```
+
+- **Training** (`gate`): backtests every recipe on panels truncated at each fold cutoff,
+  applies the frozen gate, registers the champion.
+- **Batch inference** (`predict`): publishes the champion's forecasts through a locked,
+  staged, atomic protocol.
+- **Serving** (`serve`): read-only, re-validates integrity and freshness per request.
+
+Details: [docs/architecture.md](docs/architecture.md). Design decisions and the reviews
+that shaped them: [docs/design.md](docs/design.md).
 
 ## Run it
 
-Requires [uv](https://docs.astral.sh/uv/). The CLI is the only interface; there is no
-Makefile, so the commands are the same on Windows, Linux, CI and Docker.
+Requires [uv](https://docs.astral.sh/uv/). The CLI is the only interface, so the commands
+are the same on Windows, Linux, CI and Docker.
 
 ```sh
 uv sync --locked
-uv run pytest                                # offline
+uv run pytest                                # offline, about 2 minutes
 uv run forecastgate reproduce --fixture      # offline, on the committed data slice
-uv run forecastgate backtest --fixture       # offline backtest of every recipe
+uv run forecastgate backtest --fixture       # backtest every recipe; registers nothing
 uv run forecastgate gate --fixture           # training: backtest, gate, register (exit 10 = rejected)
 uv run forecastgate predict --fixture        # batch inference: publish the champion
 uv run forecastgate serve-check --fixture --as-of 2011-12-05   # what serving would serve
 uv run forecastgate serve --fixture --as-of 2011-12-05         # read-only API on :8000
-uv run forecastgate reproduce                # downloads the full dataset (hash-pinned)
+uv run forecastgate reproduce                # full data: downloads the pinned archive
 ```
 
 Docker:
@@ -29,48 +77,67 @@ Docker:
 ```sh
 docker build -t forecastgate .
 docker run --rm --network none forecastgate uv run forecastgate reproduce --fixture
-docker run --rm forecastgate uv run forecastgate reproduce      # full data; downloads the archive
+docker run --rm forecastgate uv run forecastgate reproduce      # full data
 ```
 
-## Status
+A full-data `reproduce` regenerates [reports/data_audit.md](reports/data_audit.md) and
+[reports/backtest.md](reports/backtest.md) byte-identically; run details go to
+[reports/provenance.json](reports/provenance.json).
+
+Exit codes: 0 success; 3 data contract; 4 prediction contract; 5 publication refused;
+6 publication lock held; 7 gate not frozen; 8 gate config mismatch; 9 no or stale
+champion; 10 gate rejected the candidate; 11 serving refused.
+
+## What is verified
+
+Every failure case below is demonstrated with real commands, exit codes and output in
+[docs/failures.md](docs/failures.md), generated by `scripts/failure_demos.py`.
 
 | Capability | State | Evidence |
 |---|---|---|
-| Hash-pinned download, raw data contract, sheet-overlap rule, code normalisation, exclusions | Implemented, tested | `tests/test_ingest.py`; modified real archives rejected in `tests/test_audit_and_cache.py`; corrupted archive in `tests/test_reproduce_fixture.py` |
+| Hash-pinned download, raw data contract, sheet-overlap rule, code normalisation, exclusions | Implemented, tested | `tests/test_ingest.py`, `tests/test_audit_and_cache.py`, `tests/test_reproduce_fixture.py` |
 | Deterministic data audit, provenance kept separate | Implemented, tested | [reports/data_audit.md](reports/data_audit.md), `tests/test_audit_and_cache.py` |
-| Parse cache keyed by archive hash, re-validated on read | Implemented, tested | `tests/test_audit_and_cache.py` |
-| Weekly panel: complete weeks, zero-transaction weeks as missing | Implemented, tested | `tests/test_panel.py` |
-| Product universe as of the cutoff | Implemented, tested | `tests/test_universe_and_recipes.py` |
-| `naive` and `ma4` baseline recipes | Implemented, tested | `tests/test_universe_and_recipes.py` |
-| Prediction contract, locked atomic publication, idempotent reruns, identity covering the model input | Implemented, tested | `tests/test_publish.py`, `tests/test_reproduce_fixture.py` |
-| Features at a forecast origin, training rows with `t + h <= T`, inference rows | Implemented, tested | `tests/test_features.py` (hand-computed alignment, missing weeks) |
-| Leakage tests: truncation equivalence at fold cutoffs and training origins, label eligibility, two planted leaks | Implemented, tested on the fixture | `tests/test_leakage.py` |
-| Backtest cutoffs | Implemented, tested | `tests/test_features.py` |
-| Rolling-origin backtest of `naive`, `ma4` and `lgbm` on truncated panels; WAPE, bias, MASE with edge cases; per-fold oracle | Implemented, tested on the fixture | `tests/test_backtest.py`; `uv run forecastgate backtest --fixture` |
-| Full-data backtest refused until `gate.yaml` is committed | Implemented, tested | `tests/test_backtest.py` |
-| Full-data backtest report | Planned (after the gate freeze) | |
-| Frozen `gate.yaml`: full-data runs require it committed and unchanged; effective config must match | Implemented, tested | `tests/test_gate.py` |
-| Gate criteria evaluated in code, decision in the backtest report | Implemented, tested | `tests/test_gate.py` |
-| JSON registry with `champion` alias and checksummed models; baseline as initial champion; refit at the publication cutoff | Implemented, tested | `tests/test_registry.py` |
-| `gate` exits 10 on rejection with the alias unchanged; `reproduce` still publishes the champion | Implemented, tested | `tests/test_registry.py` |
-| Full-data `reproduce` inside Docker, freeze verified from packaged git metadata; reports byte-identical to the committed ones | Implemented, verified locally in the image | manual CI job `full-data-docker` (configured, not yet verified) |
-| GitHub Actions CI: lint, types, tests, fixture runs locally and in Docker | Configured, not yet verified: it has not run on GitHub | `.github/workflows/ci.yml` |
-| Read-only serving: stale, future-dated, tampered or inconsistent artifacts refused with 503 | Implemented, tested | `tests/test_serving.py`; `forecastgate serve`, `forecastgate serve-check` |
+| Weekly panel, universe as of the cutoff, baselines | Implemented, tested | `tests/test_panel.py`, `tests/test_universe_and_recipes.py` |
+| Features at a forecast origin; training labels with `t + h <= T` | Implemented, tested | `tests/test_features.py` |
+| Leakage: truncation equivalence, label eligibility, two planted leaks detected | Implemented, tested on the fixture | `tests/test_leakage.py` |
+| Rolling-origin backtest on truncated panels; WAPE, bias, MASE with undefined cases | Implemented, tested | `tests/test_backtest.py`, [reports/backtest.md](reports/backtest.md) |
+| Gate frozen before evaluation; full-data runs require it committed and unchanged | Implemented, tested | `tests/test_gate.py`, commits `2bc7216` and `d00b5d1` |
+| Registry, baseline as initial champion, exit 10 on rejection, weak model blocked | Implemented, tested | `tests/test_registry.py` |
+| Atomic, idempotent publication; inconsistent reruns refused | Implemented, tested | `tests/test_publish.py` |
+| Read-only serving refuses stale, future-dated, tampered or inconsistent artifacts | Implemented, tested | `tests/test_serving.py` |
+| Full-data `reproduce` in Docker, freeze verified in the image, reports byte-identical | Verified locally in the image | provenance at commit `02b63d7` |
+| No git credentials in any image layer | Verified locally | [docs/failures.md](docs/failures.md), demonstration 7 |
+| GitHub Actions CI, including the manual `full-data-docker` job | Configured, not yet verified | `.github/workflows/ci.yml` |
 
-## First full-data evaluation
+## Limitations
 
-Against the gate frozen at commit `2bc7216`, `lgbm` reduced pooled backtest WAPE by 1.9%
-relative to the 4-week moving average (0.6096 vs 0.6212) but did not satisfy the
-promotion criteria: below the 5% pooled bar, 3 of 6 folds won, and worse at horizons 1
-and 3. `ma4` is the registered champion and `reproduce` publishes its forecasts. See
-[reports/backtest.md](reports/backtest.md).
+- **Recorded sales, not demand.** The target is invoiced quantity after exclusions. A
+  week without sales is zero *recorded* sales; stockouts and unavailable products are
+  not observed, so true demand is not measured.
+- **Product selection.** Results describe the 200 highest-volume products with at least
+  26 weeks of history at each cutoff, not new, slow-moving or intermittent products. A
+  small number of probable products with non-standard codes (`DCGS…`, `SP1002`) are
+  excluded by the product-code rule; the audit lists them.
+- **Historical clock.** The data ends on 2011-12-09. Serving freshness uses an explicit
+  simulated `--as-of` date. There is no scheduler, retraining loop, drift monitoring or
+  live traffic.
+- **Dataset assumptions.** One retailer and two years, so the final folds have one prior
+  Christmas season. Identical rows are dropped as presumed duplicates (0.30% of sales
+  quantity). Weeks with no transactions at all are treated as closures, not as zero
+  sales. Cancellations are excluded rather than netted against sales.
+- **Evaluation.** Six folds, one run per cutoff, fixed hyperparameters with no tuning.
+  The fixture slice used in CI covers 60 steadily selling products and is not evidence of
+  model quality.
+- **The LightGBM result.** It lowered pooled WAPE by 1.9% but failed the promotion
+  criteria, and its MASE was slightly worse than `ma4`'s. This project makes no claim
+  that it improves forecasts, and no per-product analysis was done, so nothing is
+  claimed about where its gains or losses occur.
+- **Engineering scope.** Single machine; a file-based JSON registry rather than MLflow;
+  one publisher at a time. The Docker image ships git history as a reproducibility
+  tradeoff (see [docs/architecture.md](docs/architecture.md)). CI has not run on GitHub.
 
-## Data
+## Data and licence
 
-UCI *Online Retail II* by D. Chen (2012), CC BY 4.0,
-https://doi.org/10.24432/C5CG6D. The committed fixture is a slice of it; see
-[data/fixture/README.md](data/fixture/README.md).
-
-## Licence
-
-Code: MIT. Data: CC BY 4.0, as above.
+UCI *Online Retail II* by D. Chen (2012), CC BY 4.0, https://doi.org/10.24432/C5CG6D. The
+committed fixture is a slice of it; see [data/fixture/README.md](data/fixture/README.md).
+Code: MIT.
