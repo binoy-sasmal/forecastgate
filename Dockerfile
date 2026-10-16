@@ -23,6 +23,9 @@ RUN set -eu; \
     cp -r .git/HEAD .git/objects .git/refs .git/index /out/.git/; \
     if [ -f .git/packed-refs ]; then cp .git/packed-refs /out/.git/; fi; \
     git -C /out init --quiet; \
+    # Compare content, not permission bits: a Windows build context does not carry the
+    # file modes git recorded, which would make every tracked file look modified.
+    git -C /out config core.filemode false; \
     rm -rf /out/.git/hooks; \
     git -C /out rev-parse --verify HEAD > /dev/null
 
