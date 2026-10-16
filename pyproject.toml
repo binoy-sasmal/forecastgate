@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"
 dependencies = [
+    "lightgbm>=4.5",
     "numpy>=2.1",
     "openpyxl>=3.1",
     "pandas>=2.2",
@@ -42,7 +43,7 @@ strict = true
 files = ["src", "tests", "scripts"]
 
 [[tool.mypy.overrides]]
-module = ["openpyxl.*"]
+module = ["openpyxl.*", "lightgbm.*", "sklearn.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

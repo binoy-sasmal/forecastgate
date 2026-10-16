@@ -16,6 +16,7 @@ Makefile, so the commands are the same on Windows, Linux, CI and Docker.
 uv sync --locked
 uv run pytest                                # offline
 uv run forecastgate reproduce --fixture      # offline, on the committed data slice
+uv run forecastgate backtest --fixture       # offline backtest of every recipe
 uv run forecastgate reproduce                # downloads the full dataset (hash-pinned)
 ```
 
@@ -40,7 +41,9 @@ docker run --rm --network none forecastgate uv run forecastgate reproduce --fixt
 | Features at a forecast origin, training rows with `t + h <= T`, inference rows | Implemented, tested | `tests/test_features.py` (hand-computed alignment, missing weeks) |
 | Leakage tests: truncation equivalence at fold cutoffs and training origins, label eligibility, two planted leaks | Implemented, tested on the fixture | `tests/test_leakage.py` |
 | Backtest cutoffs | Implemented, tested | `tests/test_features.py` |
-| Rolling-origin backtest, LightGBM, metrics | Planned | |
+| Rolling-origin backtest of `naive`, `ma4` and `lgbm` on truncated panels; WAPE, bias, MASE with edge cases; per-fold oracle | Implemented, tested on the fixture | `tests/test_backtest.py`; `uv run forecastgate backtest --fixture` |
+| Full-data backtest refused until `gate.yaml` is committed | Implemented, tested | `tests/test_backtest.py` |
+| Full-data backtest report | Planned (after the gate freeze) | |
 | Promotion gate, registry, baseline champion | Planned | |
 | Read-only serving with freshness checks | Planned | |
 

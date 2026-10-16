@@ -158,8 +158,8 @@ def test_audit_is_deterministic_and_provenance_is_separate(
     assert b"\r" not in first
     assert b"commit" not in first.lower().replace(b"(commit,", b"")
     provenance = json.loads((reports / "provenance.json").read_text(encoding="utf-8"))
-    assert provenance["git_sha"] == "later-commit"
-    assert set(provenance["packages"]) >= {"pandas", "pandera"}
+    assert provenance["data_audit.md"]["git_sha"] == "later-commit"
+    assert set(provenance["data_audit.md"]["packages"]) >= {"pandas", "pandera"}
 
 
 def test_fixture_audit_records_the_ingest_facts(checkout: Path) -> None:

@@ -18,8 +18,11 @@ from pathlib import Path
 import pandas as pd
 
 SHEETS = ("Year 2009-2010", "Year 2010-2011")
-WINDOW_START = pd.Timestamp("2010-06-01")
-WINDOW_END = pd.Timestamp("2011-04-01")  # exclusive
+# From October 2010 to the end of the file: keeps the sheet overlap, the zero-transaction
+# week of 2010-12-27 and the partial final week, and leaves the six backtest folds of the
+# full run (late May to November 2011) clear of the closure, under the full-run settings.
+WINDOW_START = pd.Timestamp("2010-10-01")
+WINDOW_END = pd.Timestamp("2011-12-10")  # exclusive; the file ends 2011-12-09 12:50
 N_PRODUCTS = 60
 # Non-product rows kept so the exclusion rules have real inputs. The sub-window spans the
 # sheet overlap (2010-12-01 to 2010-12-09) so overlap handling sees them too.

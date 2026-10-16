@@ -115,9 +115,11 @@ Train, predict and serve are separate entrypoints sharing only `features/`, the 
 interface and artifacts on disk.
 
 **Recipe** = a forecasting method plus its config: `naive`, `ma4` (4-week moving average)
-or `lgbm`. Every recipe implements the same `fit(history up to T)` / `predict(T, horizons)`
-interface and produces artifacts with the same metadata, so baselines are first-class
-models.
+or `lgbm`. Every recipe implements the same `fit` / `predict` interface on a panel
+truncated at its cutoff (`Panel.truncated(T)`), so no recipe can reach a week after T, and
+produces artifacts with the same metadata, so baselines are first-class models.
+`lgbm` uses LightGBM's native training API with fixed parameters, single-threaded and
+deterministic; the backtest report is byte-identical on Windows and in the Linux image.
 
 ## 4. Evaluation
 
@@ -151,8 +153,8 @@ would need nested folds.
 ### Backtest
 
 Six cutoffs 4 weeks apart. The last cutoff is the last complete week minus 4, so every
-fold has all four horizons observed. The fixture profile shortens only the universe
-windows (8 weeks of history and ranking instead of 26) so six folds fit its 42 weeks. Each recipe is refitted per fold using only that
+fold has all four horizons observed. The committed fixture spans October 2010 to the end
+of the file, so it runs under exactly the full-run settings and the same fold dates. Each recipe is refitted per fold using only that
 fold's eligible examples. Candidate, baselines and champion are always evaluated as
 recipes on the **same folds**, never as a model fitted on later data.
 

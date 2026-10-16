@@ -70,7 +70,7 @@ def test_too_small_universe_fails_the_contract() -> None:
 def test_naive_skips_missing_weeks() -> None:
     panel = _panel({"A": [3.0, 4.0, float("nan")]})
     cutoff = panel.weeks[-1]
-    forecast = Naive().fit(panel.history(cutoff), cutoff).predict(["A"], (1, 2))
+    forecast = Naive().fit(panel, ["A"], (1, 2)).predict(panel, ["A"], (1, 2))
     assert forecast["prediction"].tolist() == [4.0, 4.0]
     assert forecast["target_week"].tolist() == [cutoff + WEEK, cutoff + 2 * WEEK]
 
@@ -78,15 +78,26 @@ def test_naive_skips_missing_weeks() -> None:
 def test_moving_average_uses_observed_weeks_and_falls_back_to_naive() -> None:
     nan = float("nan")
     panel = _panel({"A": [9.0, 2.0, 4.0, nan, 6.0], "B": [5.0, nan, nan, nan, nan]})
-    cutoff = panel.weeks[-1]
-    forecast = MovingAverage().fit(panel.history(cutoff), cutoff).predict(["A", "B"], (1,))
+    forecast = MovingAverage().fit(panel, ["A", "B"], (1,)).predict(panel, ["A", "B"], (1,))
     assert forecast.set_index("stock_code")["prediction"].to_dict() == {"A": 4.0, "B": 5.0}
 
 
-def test_fit_refuses_history_past_the_cutoff() -> None:
+def test_truncated_panel_hides_everything_after_the_cutoff() -> None:
+    panel = _panel({"A": [1.0, 2.0, 3.0, 4.0], "B": [7.0, 8.0]})
+    cutoff = panel.weeks[1]
+    visible = panel.truncated(cutoff)
+    assert visible.last_complete_week == cutoff
+    assert visible.frame["week"].max() == cutoff
+    assert list(visible.first_sale_week.index) == ["A"]  # B's first sale is later
+    forecast = Naive().fit(visible, ["A"], (1,)).predict(visible, ["A"], (1,))
+    assert forecast["prediction"].tolist() == [2.0]
+
+
+def test_predict_refuses_a_panel_from_another_cutoff() -> None:
     panel = _panel({"A": [1.0, 2.0, 3.0]})
-    with pytest.raises(ValueError, match="past cutoff"):
-        Naive().fit(panel.frame, panel.weeks[-2])
+    fitted = Naive().fit(panel.truncated(panel.weeks[1]), ["A"], (1,))
+    with pytest.raises(ValueError, match="fitted at"):
+        fitted.predict(panel, ["A"], (1,))
 
 
 def test_postprocess_clips_negative_forecasts() -> None:

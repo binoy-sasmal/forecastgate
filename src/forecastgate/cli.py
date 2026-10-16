@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
 from forecastgate.config import settings_for
 from forecastgate.errors import ForecastgateError
+from forecastgate.pipeline import backtest as run_backtest
 from forecastgate.pipeline import reproduce as run_reproduce
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+FixtureOption = Annotated[
+    bool, typer.Option("--fixture", help="Run offline on the committed fixture slice.")
+]
+ArtifactsOption = Annotated[
+    Path | None, typer.Option(help="Where artifacts go. Default: artifacts/<source>.")
+]
 
 
 @app.callback()
@@ -20,14 +28,7 @@ def _root() -> None:
 
 
 @app.command()
-def reproduce(
-    fixture: Annotated[
-        bool, typer.Option("--fixture", help="Run offline on the committed fixture slice.")
-    ] = False,
-    artifacts_dir: Annotated[
-        Path | None, typer.Option(help="Where artifacts go. Default: artifacts/<source>.")
-    ] = None,
-) -> None:
+def reproduce(fixture: FixtureOption = False, artifacts_dir: ArtifactsOption = None) -> None:
     """Ingest, fit, predict and publish, from a clean checkout."""
     root = Path.cwd()
     settings = settings_for(fixture=fixture, root=root, artifacts_dir=artifacts_dir)
@@ -46,9 +47,33 @@ def reproduce(
     typer.echo(f"cutoff week       {summary.cutoff_week}")
     typer.echo(f"universe          {summary.universe_size} products")
     typer.echo(f"recipe            {summary.recipe}")
-    typer.echo(f"data audit        {summary.reports[0]}")
+    typer.echo(f"data audit        {summary.audit}")
     result = summary.published
     typer.echo(f"publication       {result.status} {result.identity} at {result.path}")
+
+
+@app.command()
+def backtest(
+    fixture: FixtureOption = False,
+    artifacts_dir: ArtifactsOption = None,
+    inject_leak: Annotated[
+        Literal["future_window", "origin_filter"] | None,
+        typer.Option(help="Plant a deliberate leak in lgbm, for the failure demonstrations."),
+    ] = None,
+) -> None:
+    """Rolling-origin backtest of every recipe; writes the backtest report."""
+    root = Path.cwd()
+    settings = settings_for(fixture=fixture, root=root, artifacts_dir=artifacts_dir)
+    try:
+        summary = run_backtest(settings, root=root, fixture=fixture, leak=inject_leak)
+    except ForecastgateError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(exc.exit_code) from exc
+    for fold in summary.result.folds:
+        typer.echo(
+            f"fold {fold.index}            {fold.cutoff:%Y-%m-%d}, {fold.universe_size} products"
+        )
+    typer.echo(f"report            {summary.report}")
 
 
 def main() -> None:

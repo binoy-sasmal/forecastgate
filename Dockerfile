@@ -10,7 +10,11 @@ ENV UV_LINK_MODE=copy \
     UV_NO_SYNC=1
 
 WORKDIR /app
-RUN useradd --create-home --uid 10001 app
+# LightGBM links against the OpenMP runtime, which the slim image does not ship.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 app
 
 # Dependencies first, so source edits do not invalidate this layer.
 COPY pyproject.toml uv.lock README.md ./

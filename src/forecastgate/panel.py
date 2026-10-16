@@ -57,6 +57,24 @@ class Panel:
         """Panel rows observable at the end of week `cutoff`."""
         return self.frame[self.frame["week"] <= cutoff]
 
+    def truncated(self, cutoff: pd.Timestamp) -> Panel:
+        """The panel as it was at the end of week `cutoff`: nothing later is reachable.
+
+        Recipes only ever receive a truncated panel, so a recipe cannot read the future
+        even by mistake.
+        """
+        if cutoff not in self.weeks:
+            raise DataContractError(f"cutoff {cutoff.date()} is not a complete week")
+        first = self.first_sale_week
+        return Panel(
+            frame=self.history(cutoff).reset_index(drop=True),
+            first_sale_week=first[first <= cutoff],
+            weeks=self.weeks[self.weeks <= cutoff],
+            zero_transaction_weeks=self.zero_transaction_weeks[
+                self.zero_transaction_weeks <= cutoff
+            ],
+        )
+
 
 def week_of(timestamps: pd.Series) -> pd.Series:
     day = timestamps.dt.normalize()

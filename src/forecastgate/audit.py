@@ -168,14 +168,23 @@ def write_text(path: Path, text: str) -> None:
     os.replace(partial, path)
 
 
-def write_reports(
-    reports_dir: Path, audit: str, settings: Settings, git_sha: str
-) -> tuple[Path, Path]:
-    audit_path = reports_dir / AUDIT_FILE
+def write_report(
+    reports_dir: Path, name: str, content: str, settings: Settings, git_sha: str
+) -> Path:
+    """Write a deterministic report and record its run provenance under its file name.
+
+    `provenance.json` maps each report file to the run that last wrote it, so writing one
+    report never erases another report's provenance.
+    """
+    path = reports_dir / name
+    write_text(path, content)
     provenance_path = reports_dir / PROVENANCE_FILE
-    write_text(audit_path, audit)
-    write_text(
-        provenance_path,
-        json.dumps(provenance(settings, git_sha), indent=2, sort_keys=True) + "\n",
-    )
-    return audit_path, provenance_path
+    try:
+        existing = json.loads(provenance_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        existing = {}
+    # A file from before per-report provenance holds a single run's fields at top level.
+    records = existing if isinstance(existing, dict) and "git_sha" not in existing else {}
+    records[name] = provenance(settings, git_sha)
+    write_text(provenance_path, json.dumps(records, indent=2, sort_keys=True) + "\n")
+    return path

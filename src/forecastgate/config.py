@@ -20,7 +20,7 @@ class DataSource:
 
 FULL_SOURCE_URL = "https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip"
 FULL_SOURCE_SHA256 = "572e36277c2390fbfde10664750731e0a86f55e33470d91919085f0408e67bfb"
-FIXTURE_SHA256 = "dd91b620dbc68f35f3d67bc4580a5e87d993558bcc078975b9278b54131270cb"
+FIXTURE_SHA256 = "ea595f1000bd1fd3f33bc4fd6ef743b9759b9acc9227bcdbe90a381c469dea80"
 
 
 @dataclass(frozen=True)
@@ -63,15 +63,5 @@ def settings_for(*, fixture: bool, root: Path, artifacts_dir: Path | None = None
     artifacts = artifacts_dir or root / "artifacts" / source.name
     # Only the full run writes the committed reports; fixture reports stay with its artifacts.
     reports = artifacts / "reports" if fixture else root / "reports"
-    if fixture:
-        # The fixture spans 42 complete weeks, too few for six folds under the 26-week
-        # history rule. Its profile shortens only the universe windows; everything else,
-        # including folds, horizons and universe size, matches the full run.
-        return Settings(
-            source=source,
-            artifacts_dir=artifacts,
-            reports_dir=reports,
-            min_history_weeks=8,
-            ranking_window_weeks=8,
-        )
+    # The fixture runs under exactly the full-run settings; only the source differs.
     return Settings(source=source, artifacts_dir=artifacts, reports_dir=reports)
