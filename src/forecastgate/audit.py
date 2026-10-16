@@ -24,7 +24,7 @@ from forecastgate.universe import eligible_products
 
 AUDIT_FILE = "data_audit.md"
 PROVENANCE_FILE = "provenance.json"
-PACKAGES = ("pandas", "pandera", "numpy", "pyarrow", "openpyxl")
+PACKAGES = ("pandas", "pandera", "numpy", "pyarrow", "openpyxl", "lightgbm", "pyyaml")
 
 
 def _ts(value: pd.Timestamp) -> str:
